@@ -213,7 +213,6 @@
             gap: 1.5rem;
         }
 
-        /* Minijáték CSS (változatlan) */
         #game-area {
             position: relative;
             width: 100%;
@@ -328,7 +327,7 @@
             correctAnswer: null,
             gameTimer: null,
             gameScore: 0,
-            questionCount: 0, // 0-tól 19-ig
+            questionCount: 0,
             maxQuestions: 20,
             roundCorrectAnswers: 0
         };
@@ -339,7 +338,7 @@
             miniGameDuration: 15
         };
 
-        // --- HANGKEZELÉS (Web Audio API) ---
+        // --- HANGKEZELÉS ---
         let audioCtx;
         let soundEnabled = true;
 
@@ -429,7 +428,7 @@
             badge.classList.add('bump');
         }
 
-        // --- MATEMATIKAI LOGIKA ÉS FOLYAMATJELZŐ ---
+        // --- FOLYAMATJELZŐ ÉS OKOSÍTOTT MATEMATIKAI LOGIKA ---
         function initProgressBar() {
             const bar = document.getElementById('progress-bar');
             bar.innerHTML = '';
@@ -455,26 +454,48 @@
             let a, b, answer, symbol;
             switch(op) {
                 case 'add':
-                    a = Math.floor(Math.random() * 89) + 1;
-                    b = Math.floor(Math.random() * (100 - a)) + 1;
+                    // Legalább 15-ről indul, kivédve a túl pici összeadásokat
+                    a = Math.floor(Math.random() * 75) + 15; // 15-89
+                    let maxB = 100 - a;
+                    let minB = (maxB > 10) ? 8 : maxB; // Legalább 8-at adunk hozzá, ha kifér a 100-ból
+                    b = Math.floor(Math.random() * (maxB - minB + 1)) + minB;
                     answer = a + b;
                     symbol = '+';
                     break;
                 case 'sub':
-                    a = Math.floor(Math.random() * 90) + 10;
-                    b = Math.floor(Math.random() * a);
+                    // Okosított másodikos kivonás: Gyakori a tízesátlépés!
+                    if (Math.random() < 0.6) { 
+                        // 60% esély tízesátlépés kikényszerítésére
+                        let onesA = Math.floor(Math.random() * 5) + 1; // 1-5
+                        let onesB = Math.floor(Math.random() * 4) + onesA + 1; // Biztosan nagyobb mint onesA
+                        let tensA = Math.floor(Math.random() * 7) + 3; // 3-9
+                        a = tensA * 10 + onesA; // pl. 52
+                        
+                        if (Math.random() < 0.5) {
+                            b = onesB; // Egyjegyű kivonása, pl. 52 - 8
+                        } else {
+                            let tensB = Math.floor(Math.random() * (tensA - 1)) + 1;
+                            b = tensB * 10 + onesB; // Kétjegyű kivonása, pl. 52 - 28
+                        }
+                    } else {
+                        // 40% esély sima, de masszív kétjegyű kivonásra
+                        a = Math.floor(Math.random() * 50) + 40; // 40-89
+                        b = Math.floor(Math.random() * (a - 20)) + 11; // 11-től a-20-ig
+                    }
                     answer = a - b;
                     symbol = '-';
                     break;
                 case 'mul':
-                    a = Math.floor(Math.random() * 10) + 1;
-                    b = Math.floor(Math.random() * 10) + 1;
+                    // Az 1-es szorzótábla mellőzése
+                    a = Math.floor(Math.random() * 9) + 2; // 2-10
+                    b = Math.floor(Math.random() * 9) + 2; // 2-10
                     answer = a * b;
                     symbol = '×';
                     break;
                 case 'div':
-                    b = Math.floor(Math.random() * 10) + 1;
-                    answer = Math.floor(Math.random() * 10) + 1;
+                    // Az 1-gyel való osztás mellőzése
+                    b = Math.floor(Math.random() * 9) + 2; // Osztó: 2-10
+                    answer = Math.floor(Math.random() * 9) + 2; // Hányados: 2-10
                     a = b * answer;
                     symbol = '÷';
                     break;
@@ -515,7 +536,6 @@
             const feedbackEl = document.getElementById('feedback-msg');
             const userAnswer = parseInt(inputEl.value, 10);
             
-            // Folyó kérdés szakaszának kiválasztása
             const segments = document.querySelectorAll('.segment');
             const currentSeg = segments[state.questionCount];
 
@@ -529,7 +549,6 @@
                 return;
             }
 
-            // Gombok és input letiltása a várakozási időre (Logikai védelem)
             inputEl.disabled = true;
             btnEl.disabled = true;
 
@@ -561,7 +580,7 @@
                 } else {
                     endPracticeRound();
                 }
-            }, 2000); // 2 másodperc szünet, hogy lássa a helyes választ vagy örüljön a csillagnak
+            }, 2000); 
         }
 
         function endPracticeRound() {
