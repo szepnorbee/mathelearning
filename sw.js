@@ -1,38 +1,47 @@
-const CACHE_NAME = 'matek-kaland-v1';
+const CACHE_NAME = 'matek-kaland-v2';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './manifest.json'
-  // Ha lesznek ikonjaid, azokat is írd ide: './icon-192.png', './icon-512.png'
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
-// Telepítés és gyorsítótárazás
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(ASSETS_TO_CACHE))
+      .then(cache => {
+        console.log('Fájlok gyorsítótárazása sikeres.');
+        return cache.addAll(ASSETS_TO_CACHE);
+      })
   );
+  self.skipWaiting();
 });
 
-// Régi gyorsítótárak törlése frissítéskor
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cache => {
           if (cache !== CACHE_NAME) {
+            console.log('Régi gyorsítótár törlése:', cache);
             return caches.delete(cache);
           }
         })
       );
     })
   );
+  self.clients.claim();
 });
 
-// Offline működés biztosítása (Cache First stratégia)
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
-      .then(response => response || fetch(event.request))
+      .then(response => {
+        if (response) {
+          return response; // Ha megvan a gyorsítótárban, onnan adjuk vissza (offline mód)
+        }
+        return fetch(event.request); // Különben letöltjük a webről
+      })
   );
 });
