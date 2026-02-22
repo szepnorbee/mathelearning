@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4ECDC4">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    
     <title>Matek Kaland</title>
     <style>
         :root {
@@ -38,25 +42,21 @@
             from { opacity: 0; transform: translateY(15px); }
             to { opacity: 1; transform: translateY(0); }
         }
-
         @keyframes pop {
             0% { transform: scale(1); }
             50% { transform: scale(1.2); }
             100% { transform: scale(1); }
         }
-
         @keyframes shake {
             0%, 100% { transform: translateX(0); }
             20%, 60% { transform: translateX(-10px); }
             40%, 80% { transform: translateX(10px); }
         }
-
         @keyframes float {
             0% { transform: translateY(0px) rotate(0deg); }
             50% { transform: translateY(-15px) rotate(5deg); }
             100% { transform: translateY(0px) rotate(0deg); }
         }
-
         @keyframes popBalloon {
             0% { transform: scale(1); opacity: 1; }
             100% { transform: scale(0); opacity: 0; }
@@ -80,11 +80,7 @@
             align-items: center;
         }
 
-        .icon-btn {
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-
+        .icon-btn { cursor: pointer; transition: transform 0.2s; }
         .icon-btn:active { transform: scale(0.8); }
 
         .points-badge {
@@ -98,7 +94,6 @@
             gap: 5px;
             transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-
         .points-badge.bump { transform: scale(1.2); }
 
         main {
@@ -117,7 +112,6 @@
             max-width: 400px;
             text-align: center;
         }
-
         .view.active {
             display: flex;
             flex-direction: column;
@@ -137,12 +131,10 @@
             transition: all 0.15s ease;
             width: 100%;
         }
-
         button:active:not(:disabled) {
             transform: translateY(6px);
             box-shadow: 0 0 0 var(--dark);
         }
-        
         button:disabled {
             background-color: #95a5a6;
             box-shadow: 0 6px 0 #7f8c8d;
@@ -165,7 +157,6 @@
             margin-bottom: 0.5rem;
             margin-top: 0.5rem;
         }
-
         .segment {
             flex: 1;
             height: 12px;
@@ -173,7 +164,6 @@
             border-radius: 6px;
             transition: background-color 0.3s ease;
         }
-
         .segment.correct { background-color: #2ecc71; box-shadow: 0 0 5px #2ecc71; }
         .segment.incorrect { background-color: var(--secondary); box-shadow: 0 0 5px var(--secondary); }
         .segment.current { transform: scaleY(1.3); background-color: var(--primary); }
@@ -203,7 +193,6 @@
             font-weight: bold;
             transition: border-color 0.3s;
         }
-
         .answer-box.empty {
             color: #95a5a6;
             font-size: 1.5rem;
@@ -217,7 +206,6 @@
             gap: 10px;
             margin-top: 5px;
         }
-
         .key-btn {
             background-color: var(--keypad-bg);
             color: var(--dark);
@@ -227,12 +215,10 @@
             border-radius: 12px;
             box-shadow: 0 4px 0 #bdc3c7;
         }
-
         .key-btn:active:not(:disabled) {
             transform: translateY(4px);
             box-shadow: 0 0 0 #bdc3c7;
         }
-
         .key-btn.action { font-size: 1.5rem; }
         .key-btn.enter { 
             background-color: #2ecc71; 
@@ -258,7 +244,6 @@
             border-radius: 15px;
             overflow: hidden;
         }
-
         .target {
             position: absolute;
             width: 65px;
@@ -274,7 +259,6 @@
             box-shadow: inset -5px -5px 10px rgba(0,0,0,0.1);
             animation: float 2s infinite ease-in-out;
         }
-        
         .target::after {
             content: '';
             position: absolute;
@@ -287,7 +271,6 @@
             border-right: 6px solid transparent;
             border-bottom: 10px solid var(--secondary);
         }
-
         .target.popping { animation: popBalloon 0.15s forwards; }
 
         .feedback {
@@ -298,7 +281,6 @@
             align-items: center;
             justify-content: center;
         }
-
         .correct { color: #2ecc71; animation: pop 0.5s ease-in-out; }
         .incorrect { color: var(--secondary); animation: shake 0.4s ease-in-out; }
     </style>
@@ -368,6 +350,15 @@
     </main>
 
     <script>
+        // --- PWA SERVICE WORKER REGISZTRÁCIÓ ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker regisztrálva!', reg))
+                    .catch(err => console.log('Service Worker hiba:', err));
+            });
+        }
+
         // --- ÁLLAPOTTÉR ---
         let state = {
             points: 0,
@@ -387,6 +378,13 @@
             miniGameCost: 50,
             miniGameDuration: 15
         };
+
+        // --- Helyi Mentés (LocalStorage) Betöltése ---
+        const savedPoints = localStorage.getItem('matekKalandPoints');
+        if (savedPoints !== null) {
+            state.points = parseInt(savedPoints, 10);
+            document.getElementById('score-display').textContent = state.points;
+        }
 
         // --- HANGKEZELÉS ---
         let audioCtx;
@@ -470,11 +468,12 @@
 
         function updateScore(amount) {
             state.points += amount;
-            
-            // Logikai biztosíték: a pontszám sosem lehet negatív
             if (state.points < 0) state.points = 0; 
 
             document.getElementById('score-display').textContent = state.points;
+            
+            // Érték mentése a LocalStorage-ba
+            localStorage.setItem('matekKalandPoints', state.points);
             
             const badge = document.getElementById('points-container');
             badge.classList.remove('bump');
@@ -524,7 +523,7 @@
             }
         });
 
-        // --- FOLYAMATJELZŐ ÉS OKOSÍTOTT MATEMATIKAI LOGIKA ---
+        // --- FOLYAMATJELZŐ ÉS MATEMATIKAI LOGIKA ---
         function initProgressBar() {
             const bar = document.getElementById('progress-bar');
             bar.innerHTML = '';
@@ -699,7 +698,6 @@
         }
 
         function startMiniGame() {
-            // Logikai javítás: Szigorú ellenőrzés a játék indításakor (újrajátszásnál is lefut)
             if (state.points < config.miniGameCost) {
                 sounds.error();
                 alert(`Nincs elég csillagod az újrajátszáshoz! Kérlek, gyakorolj még, hogy gyűjts párat!`);
