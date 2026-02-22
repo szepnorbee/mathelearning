@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Matek Kaland</title>
+    <style>
+        :root {
+            --primary: #4ECDC4;
+            --secondary: #FF6B6B;
+            --accent: #FFE66D;
+            --dark: #1A535C;
+            --light: #F7FFF7;
+            --bg: #E8F8F5;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Comic Sans MS', 'Chalkboard SE', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--dark);
+            touch-action: manipulation;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- ANIMÁCIÓK --- */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-10px); }
+            40%, 80% { transform: translateX(10px); }
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(5deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
+        
+        @keyframes popBalloon {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.5rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .icon-btn {
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.2s;
+        }
+
+        .icon-btn:active {
+            transform: scale(0.8);
+        }
+
+        .points-badge {
+            background-color: var(--accent);
+            color: var(--dark);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .points-badge.bump {
+            transform: scale(1.2);
+        }
+
+        main {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .view {
+            display: none;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .view.active {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 1rem;
+            font-size: 1.5rem;
+            border-radius: 15px;
+            box-shadow: 0 6px 0 var(--dark);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            width: 100%;
+        }
+
+        button:active {
+            transform: translateY(6px);
+            box-shadow: 0 0 0 var(--dark);
+        }
+
+        button.op-btn { font-size: 2.5rem; }
+        button.btn-red { background-color: var(--secondary); box-shadow: 0 6px 0 #c0392b; }
+        button.btn-red:active { box-shadow: 0 0 0 #c0392b; }
+        button.btn-accent { background-color: var(--accent); color: var(--dark); box-shadow: 0 6px 0 #d4ac0d; }
+        button.btn-accent:active { box-shadow: 0 0 0 #d4ac0d; }
+
+        .problem-display {
+            font-size: 4rem;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin: 1rem 0;
+            color: var(--dark);
+        }
+
+        input[type="number"] {
+            font-size: 2rem;
+            padding: 1rem;
+            width: 100%;
+            text-align: center;
+            border: 3px solid var(--primary);
+            border-radius: 15px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="number"]:focus {
+            border-color: var(--secondary);
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        #game-area {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            background-color: white;
+            border: 4px dashed var(--primary);
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        .target {
+            position: absolute;
+            width: 65px;
+            height: 75px;
+            background-color: var(--secondary);
+            border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: inset -5px -5px 10px rgba(0,0,0,0.1);
+            animation: float 2s infinite ease-in-out;
+        }
+        
+        .target::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0; 
+            height: 0; 
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-bottom: 10px solid var(--secondary);
+        }
+
+        .target.popping {
+            animation: popBalloon 0.15s forwards;
+        }
+
+        .feedback {
+            font-size: 1.5rem;
+            font-weight: bold;
+            min-height: 2.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .correct { color: #2ecc71; animation: pop 0.5s ease-in-out; }
+        .incorrect { color: var(--secondary); animation: shake 0.4s ease-in-out; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-controls">
+            <div id="back-btn" class="icon-btn" style="visibility: hidden;" onclick="navTo('menu')">🏠</div>
+            <div id="sound-toggle" class="icon-btn" onclick="toggleSound()">🔊</div>
+        </div>
+        <div class="points-badge" id="points-container">⭐ <span id="score-display">0</span></div>
+    </header>
+
+    <main>
+        <div id="view-menu" class="view active">
+            <h2>Válassz feladatot!</h2>
+            <div class="grid-2">
+                <button class="op-btn" onclick="startPractice('add')">➕</button>
+                <button class="op-btn" onclick="startPractice('sub')">➖</button>
+                <button class="op-btn" onclick="startPractice('mul')">✖️</button>
+                <button class="op-btn" onclick="startPractice('div')">➗</button>
+            </div>
+            <hr style="border-top: 3px dotted #bdc3c7; margin: 1rem 0;">
+            <h2>Játéksarok</h2>
+            <button class="btn-accent" onclick="openMiniGameMenu()">🎮 Lufivadászat (50 ⭐)</button>
+        </div>
+
+        <div id="view-practice" class="view">
+            <h2 id="practice-title">Gyakorlás</h2>
+            <div class="problem-display" id="math-problem"></div>
+            <input type="number" id="answer-input" placeholder="Ide írd a választ!" inputmode="numeric">
+            <button onclick="checkAnswer()">Ellenőrzés ✔️</button>
+            <div id="feedback-msg" class="feedback"></div>
+        </div>
+
+        <div id="view-minigame" class="view">
+            <h2>Lufivadászat 🎈</h2>
+            <p>Pukkaszd ki a lufikat, amilyen gyorsan csak tudod!</p>
+            <p style="font-size: 1.2rem; font-weight: bold;">Idő: <span id="game-timer" style="color: var(--secondary);">15</span> mp</p>
+            <div id="game-area"></div>
+            <button class="btn-red" id="start-game-btn" onclick="startMiniGame()">Játék indítása!</button>
+        </div>
+    </main>
+
+    <script>
+        // --- ÁLLAPOTTÉR ---
+        let state = {
+            points: 0,
+            currentOp: null,
+            correctAnswer: null,
+            gameTimer: null,
+            gameScore: 0
+        };
+
+        const config = {
+            pointsPerCorrect: 10,
+            miniGameCost: 50,
+            miniGameDuration: 15
+        };
+
+        // --- HANGKEZELÉS (Web Audio API) ---
+        let audioCtx;
+        let soundEnabled = true;
+
+        // Böngészők megkövetelik a felhasználói interakciót a hang engedélyezéséhez
+        function initAudio() {
+            if (!audioCtx && soundEnabled) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // Bármilyen kattintás inicializálja az audiót
+        document.body.addEventListener('touchstart', initAudio, { once: true });
+        document.body.addEventListener('click', initAudio, { once: true });
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('sound-toggle').textContent = soundEnabled ? '🔊' : '🔇';
+            initAudio();
+        }
+
+        function playTone(freq, type, duration, vol = 0.1, isSlide = false) {
+            if (!soundEnabled || !audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.type = type;
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            if (isSlide) {
+                // Gyors frekvenciaesés a pukkanás efékthez
+                osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            }
+            
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        const sounds = {
+            click: () => playTone(600, 'sine', 0.05, 0.05),
+            success: () => {
+                playTone(440, 'sine', 0.1, 0.1); // A4
+                setTimeout(() => playTone(554.37, 'sine', 0.1, 0.1), 100); // C#5
+                setTimeout(() => playTone(659.25, 'sine', 0.2, 0.1), 200); // E5
+            },
+            error: () => {
+                playTone(300, 'triangle', 0.2, 0.1);
+                setTimeout(() => playTone(250, 'triangle', 0.3, 0.1), 150);
+            },
+            pop: () => playTone(800, 'sine', 0.08, 0.2, true),
+            gameOver: () => {
+                playTone(400, 'square', 0.2, 0.05);
+                setTimeout(() => playTone(300, 'square', 0.4, 0.05), 200);
+            }
+        };
+
+        // Minden gombra kattanás hang
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', () => sounds.click());
+        });
+
+        // --- NAVIGÁCIÓ ÉS UI ---
+        function navTo(viewId) {
+            sounds.click();
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(`view-${viewId}`).classList.add('active');
+            
+            const backBtn = document.getElementById('back-btn');
+            backBtn.style.visibility = viewId === 'menu' ? 'hidden' : 'visible';
+            
+            document.getElementById('feedback-msg').textContent = '';
+            document.getElementById('feedback-msg').className = 'feedback';
+            
+            if(viewId !== 'minigame') clearInterval(state.gameTimer);
+        }
+
+        function updateScore(amount) {
+            state.points += amount;
+            document.getElementById('score-display').textContent = state.points;
+            
+            const badge = document.getElementById('points-container');
+            badge.classList.remove('bump');
+            void badge.offsetWidth; 
+            badge.classList.add('bump');
+        }
+
+        // --- MATEMATIKAI LOGIKA ---
+        function generateProblem(op) {
+            let a, b, answer, symbol;
+            switch(op) {
+                case 'add':
+                    a = Math.floor(Math.random() * 89) + 1;
+                    b = Math.floor(Math.random() * (100 - a)) + 1;
+                    answer = a + b;
+                    symbol = '+';
+                    break;
+                case 'sub':
+                    a = Math.floor(Math.random() * 90) + 10;
+                    b = Math.floor(Math.random() * a);
+                    answer = a - b;
+                    symbol = '-';
+                    break;
+                case 'mul':
+                    a = Math.floor(Math.random() * 10) + 1;
+                    b = Math.floor(Math.random() * 10) + 1;
+                    answer = a * b;
+                    symbol = '×';
+                    break;
+                case 'div':
+                    b = Math.floor(Math.random() * 10) + 1;
+                    answer = Math.floor(Math.random() * 10) + 1;
+                    a = b * answer;
+                    symbol = '÷';
+                    break;
+            }
+            state.correctAnswer = answer;
+            
+            const problemEl = document.getElementById('math-problem');
+            problemEl.style.opacity = 0;
+            setTimeout(() => {
+                problemEl.textContent = `${a} ${symbol} ${b} = ?`;
+                problemEl.style.transition = "opacity 0.3s";
+                problemEl.style.opacity = 1;
+            }, 100);
+        }
+
+        function startPractice(op) {
+            state.currentOp = op;
+            document.getElementById('practice-title').textContent = 
+                op === 'add' ? 'Összeadás' : 
+                op === 'sub' ? 'Kivonás' : 
+                op === 'mul' ? 'Szorzás' : 'Osztás';
+            
+            document.getElementById('answer-input').value = '';
+            generateProblem(op);
+            navTo('practice');
+        }
+
+        function checkAnswer() {
+            const inputEl = document.getElementById('answer-input');
+            const feedbackEl = document.getElementById('feedback-msg');
+            const userAnswer = parseInt(inputEl.value, 10);
+
+            feedbackEl.className = 'feedback';
+            void feedbackEl.offsetWidth;
+
+            if (isNaN(userAnswer)) {
+                feedbackEl.textContent = 'Kérlek írj be egy számot!';
+                feedbackEl.className = 'feedback incorrect';
+                sounds.error();
+                return;
+            }
+
+            if (userAnswer === state.correctAnswer) {
+                sounds.success();
+                updateScore(config.pointsPerCorrect);
+                feedbackEl.textContent = 'Ragyogó! +10 ⭐';
+                feedbackEl.className = 'feedback correct';
+                
+                setTimeout(() => {
+                    inputEl.value = '';
+                    feedbackEl.textContent = '';
+                    generateProblem(state.currentOp);
+                    inputEl.focus();
+                }, 1500);
+            } else {
+                sounds.error();
+                feedbackEl.textContent = 'Hoppá, ez most nem jó! Próbáld újra!';
+                feedbackEl.className = 'feedback incorrect';
+                inputEl.value = '';
+                inputEl.focus();
+            }
+        }
+
+        document.getElementById('answer-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') checkAnswer();
+        });
+
+        // --- MINIJÁTÉK LOGIKA ---
+        function openMiniGameMenu() {
+            if (state.points < config.miniGameCost) {
+                sounds.error();
+                const btn = event.currentTarget;
+                btn.style.animation = 'none';
+                void btn.offsetWidth;
+                btn.style.animation = 'shake 0.4s ease-in-out';
+                alert(`Még ${config.miniGameCost - state.points} csillag kell a játékhoz!`);
+                return;
+            }
+            document.getElementById('game-area').innerHTML = '';
+            document.getElementById('start-game-btn').style.display = 'block';
+            document.getElementById('game-timer').textContent = config.miniGameDuration;
+            navTo('minigame');
+        }
+
+        function startMiniGame() {
+            updateScore(-config.miniGameCost);
+            state.gameScore = 0;
+            
+            const btn = document.getElementById('start-game-btn');
+            btn.style.display = 'none';
+            
+            let timeLeft = config.miniGameDuration;
+            document.getElementById('game-timer').textContent = timeLeft;
+            
+            spawnTarget();
+
+            state.gameTimer = setInterval(() => {
+                timeLeft--;
+                document.getElementById('game-timer').textContent = timeLeft;
+                
+                // Idő lejártához közeledve ketyegő hang is jöhetne, de maradunk az egyszerűségnél
+                if (timeLeft <= 0) {
+                    clearInterval(state.gameTimer);
+                    endMiniGame();
+                }
+            }, 1000);
+        }
+
+        function spawnTarget() {
+            const area = document.getElementById('game-area');
+            const target = document.createElement('div');
+            target.className = 'target';
+            
+            const faces = ['😀', '😎', '🤩', '👻'];
+            target.textContent = faces[Math.floor(Math.random() * faces.length)];
+            
+            const maxX = area.clientWidth - 75;
+            const maxY = area.clientHeight - 85;
+            
+            target.style.left = Math.floor(Math.random() * maxX) + 'px';
+            target.style.top = Math.floor(Math.random() * maxY) + 'px';
+            target.style.animationDelay = `-${Math.random() * 2}s`;
+            
+            const handleHit = (e) => {
+                e.preventDefault();
+                target.removeEventListener('touchstart', handleHit);
+                target.removeEventListener('mousedown', handleHit);
+                
+                sounds.pop();
+                target.classList.add('popping');
+                state.gameScore++;
+                
+                setTimeout(() => {
+                    target.remove();
+                    spawnTarget();
+                }, 150); 
+            };
+
+            target.addEventListener('touchstart', handleHit, {passive: false});
+            target.addEventListener('mousedown', handleHit);
+            
+            area.appendChild(target);
+        }
+
+        function endMiniGame() {
+            sounds.gameOver();
+            const area = document.getElementById('game-area');
+            area.innerHTML = `
+                <div style="padding-top: 80px; text-align: center; animation: fadeIn 0.5s;">
+                    <div style="font-size: 3rem; margin-bottom: 10px;">🏆</div>
+                    <div style="font-size: 1.8rem; font-weight: bold; color: var(--dark);">Lejárt az idő!</div>
+                    <div style="font-size: 1.2rem; margin-top: 10px;">Kipukkasztott lufik: <b style="color: var(--secondary); font-size: 1.5rem;">${state.gameScore}</b></div>
+                </div>`;
+            const btn = document.getElementById('start-game-btn');
+            btn.style.display = 'block';
+            btn.textContent = 'Újra játszom (50 ⭐)';
+        }
+    </script>
+</body>
+</html>
