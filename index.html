@@ -145,6 +145,13 @@
             transform: translateY(6px);
             box-shadow: 0 0 0 var(--dark);
         }
+        
+        button:disabled {
+            background-color: #95a5a6;
+            box-shadow: 0 6px 0 #7f8c8d;
+            cursor: not-allowed;
+            transform: none;
+        }
 
         button.op-btn { font-size: 2.5rem; }
         button.btn-red { background-color: var(--secondary); box-shadow: 0 6px 0 #c0392b; }
@@ -152,11 +159,31 @@
         button.btn-accent { background-color: var(--accent); color: var(--dark); box-shadow: 0 6px 0 #d4ac0d; }
         button.btn-accent:active { box-shadow: 0 0 0 #d4ac0d; }
 
+        /* --- FOLYAMATJELZŐ CSS --- */
+        .progress-bar {
+            display: flex;
+            gap: 4px;
+            width: 100%;
+            margin-bottom: 0.5rem;
+        }
+
+        .segment {
+            flex: 1;
+            height: 12px;
+            background-color: #d1d8e0;
+            border-radius: 6px;
+            transition: background-color 0.3s ease;
+        }
+
+        .segment.correct { background-color: #2ecc71; box-shadow: 0 0 5px #2ecc71; }
+        .segment.incorrect { background-color: var(--secondary); box-shadow: 0 0 5px var(--secondary); }
+        .segment.current { transform: scaleY(1.3); background-color: var(--primary); }
+
         .problem-display {
             font-size: 4rem;
             font-weight: bold;
             letter-spacing: 2px;
-            margin: 1rem 0;
+            margin: 0.5rem 0;
             color: var(--dark);
         }
 
@@ -168,11 +195,16 @@
             border: 3px solid var(--primary);
             border-radius: 15px;
             outline: none;
-            transition: border-color 0.3s;
+            transition: border-color 0.3s, opacity 0.3s;
         }
         
         input[type="number"]:focus {
             border-color: var(--secondary);
+        }
+        
+        input[type="number"]:disabled {
+            opacity: 0.6;
+            background-color: #ecf0f1;
         }
 
         .grid-2 {
@@ -181,6 +213,7 @@
             gap: 1.5rem;
         }
 
+        /* Minijáték CSS (változatlan) */
         #game-area {
             position: relative;
             width: 100%;
@@ -262,11 +295,20 @@
         </div>
 
         <div id="view-practice" class="view">
+            <div class="progress-bar" id="progress-bar"></div>
             <h2 id="practice-title">Gyakorlás</h2>
             <div class="problem-display" id="math-problem"></div>
             <input type="number" id="answer-input" placeholder="Ide írd a választ!" inputmode="numeric">
-            <button onclick="checkAnswer()">Ellenőrzés ✔️</button>
+            <button id="check-btn" onclick="checkAnswer()">Ellenőrzés ✔️</button>
             <div id="feedback-msg" class="feedback"></div>
+        </div>
+
+        <div id="view-summary" class="view">
+            <h2>Kör vége! 🎉</h2>
+            <div style="font-size: 4rem; margin: 1rem 0;">🏆</div>
+            <p style="font-size: 1.2rem;">Szuperül dolgoztál!</p>
+            <p style="font-size: 1.5rem; font-weight: bold; color: var(--dark);">Helyes válaszok: <span id="summary-correct" style="color: #2ecc71;">0</span> / 20</p>
+            <button class="btn-accent" onclick="navTo('menu')" style="margin-top: 1rem;">Vissza a menübe</button>
         </div>
 
         <div id="view-minigame" class="view">
@@ -285,7 +327,10 @@
             currentOp: null,
             correctAnswer: null,
             gameTimer: null,
-            gameScore: 0
+            gameScore: 0,
+            questionCount: 0, // 0-tól 19-ig
+            maxQuestions: 20,
+            roundCorrectAnswers: 0
         };
 
         const config = {
@@ -298,7 +343,6 @@
         let audioCtx;
         let soundEnabled = true;
 
-        // Böngészők megkövetelik a felhasználói interakciót a hang engedélyezéséhez
         function initAudio() {
             if (!audioCtx && soundEnabled) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -308,7 +352,6 @@
             }
         }
 
-        // Bármilyen kattintás inicializálja az audiót
         document.body.addEventListener('touchstart', initAudio, { once: true });
         document.body.addEventListener('click', initAudio, { once: true });
 
@@ -328,10 +371,7 @@
             gain.connect(audioCtx.destination);
             
             osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-            if (isSlide) {
-                // Gyors frekvenciaesés a pukkanás efékthez
-                osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-            }
+            if (isSlide) osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
             
             gain.gain.setValueAtTime(vol, audioCtx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
@@ -343,9 +383,9 @@
         const sounds = {
             click: () => playTone(600, 'sine', 0.05, 0.05),
             success: () => {
-                playTone(440, 'sine', 0.1, 0.1); // A4
-                setTimeout(() => playTone(554.37, 'sine', 0.1, 0.1), 100); // C#5
-                setTimeout(() => playTone(659.25, 'sine', 0.2, 0.1), 200); // E5
+                playTone(440, 'sine', 0.1, 0.1);
+                setTimeout(() => playTone(554.37, 'sine', 0.1, 0.1), 100);
+                setTimeout(() => playTone(659.25, 'sine', 0.2, 0.1), 200);
             },
             error: () => {
                 playTone(300, 'triangle', 0.2, 0.1);
@@ -355,13 +395,14 @@
             gameOver: () => {
                 playTone(400, 'square', 0.2, 0.05);
                 setTimeout(() => playTone(300, 'square', 0.4, 0.05), 200);
+            },
+            roundWin: () => {
+                playTone(523.25, 'sine', 0.1, 0.1);
+                setTimeout(() => playTone(659.25, 'sine', 0.1, 0.1), 150);
+                setTimeout(() => playTone(783.99, 'sine', 0.1, 0.1), 300);
+                setTimeout(() => playTone(1046.50, 'sine', 0.3, 0.1), 450);
             }
         };
-
-        // Minden gombra kattanás hang
-        document.querySelectorAll('button').forEach(btn => {
-            btn.addEventListener('click', () => sounds.click());
-        });
 
         // --- NAVIGÁCIÓ ÉS UI ---
         function navTo(viewId) {
@@ -388,7 +429,28 @@
             badge.classList.add('bump');
         }
 
-        // --- MATEMATIKAI LOGIKA ---
+        // --- MATEMATIKAI LOGIKA ÉS FOLYAMATJELZŐ ---
+        function initProgressBar() {
+            const bar = document.getElementById('progress-bar');
+            bar.innerHTML = '';
+            for(let i = 0; i < state.maxQuestions; i++) {
+                const seg = document.createElement('div');
+                seg.className = 'segment';
+                bar.appendChild(seg);
+            }
+            updateProgressBarUI();
+        }
+
+        function updateProgressBarUI() {
+            const segments = document.querySelectorAll('.segment');
+            segments.forEach((seg, index) => {
+                seg.classList.remove('current');
+                if (index === state.questionCount) {
+                    seg.classList.add('current');
+                }
+            });
+        }
+
         function generateProblem(op) {
             let a, b, answer, symbol;
             switch(op) {
@@ -426,24 +488,36 @@
                 problemEl.style.transition = "opacity 0.3s";
                 problemEl.style.opacity = 1;
             }, 100);
+            
+            updateProgressBarUI();
         }
 
         function startPractice(op) {
             state.currentOp = op;
+            state.questionCount = 0;
+            state.roundCorrectAnswers = 0;
+            
             document.getElementById('practice-title').textContent = 
                 op === 'add' ? 'Összeadás' : 
                 op === 'sub' ? 'Kivonás' : 
                 op === 'mul' ? 'Szorzás' : 'Osztás';
             
             document.getElementById('answer-input').value = '';
+            
+            initProgressBar();
             generateProblem(op);
             navTo('practice');
         }
 
         function checkAnswer() {
             const inputEl = document.getElementById('answer-input');
+            const btnEl = document.getElementById('check-btn');
             const feedbackEl = document.getElementById('feedback-msg');
             const userAnswer = parseInt(inputEl.value, 10);
+            
+            // Folyó kérdés szakaszának kiválasztása
+            const segments = document.querySelectorAll('.segment');
+            const currentSeg = segments[state.questionCount];
 
             feedbackEl.className = 'feedback';
             void feedbackEl.offsetWidth;
@@ -455,29 +529,49 @@
                 return;
             }
 
+            // Gombok és input letiltása a várakozási időre (Logikai védelem)
+            inputEl.disabled = true;
+            btnEl.disabled = true;
+
             if (userAnswer === state.correctAnswer) {
                 sounds.success();
                 updateScore(config.pointsPerCorrect);
+                state.roundCorrectAnswers++;
                 feedbackEl.textContent = 'Ragyogó! +10 ⭐';
                 feedbackEl.className = 'feedback correct';
-                
-                setTimeout(() => {
-                    inputEl.value = '';
-                    feedbackEl.textContent = '';
-                    generateProblem(state.currentOp);
-                    inputEl.focus();
-                }, 1500);
+                currentSeg.classList.add('correct');
             } else {
                 sounds.error();
-                feedbackEl.textContent = 'Hoppá, ez most nem jó! Próbáld újra!';
+                feedbackEl.innerHTML = `Hoppá! A helyes válasz: <b>${state.correctAnswer}</b> volt.`;
                 feedbackEl.className = 'feedback incorrect';
-                inputEl.value = '';
-                inputEl.focus();
+                currentSeg.classList.add('incorrect');
             }
+
+            state.questionCount++;
+
+            setTimeout(() => {
+                inputEl.value = '';
+                feedbackEl.textContent = '';
+                inputEl.disabled = false;
+                btnEl.disabled = false;
+                
+                if (state.questionCount < state.maxQuestions) {
+                    generateProblem(state.currentOp);
+                    inputEl.focus();
+                } else {
+                    endPracticeRound();
+                }
+            }, 2000); // 2 másodperc szünet, hogy lássa a helyes választ vagy örüljön a csillagnak
+        }
+
+        function endPracticeRound() {
+            sounds.roundWin();
+            document.getElementById('summary-correct').textContent = state.roundCorrectAnswers;
+            navTo('summary');
         }
 
         document.getElementById('answer-input').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') checkAnswer();
+            if (e.key === 'Enter' && !this.disabled) checkAnswer();
         });
 
         // --- MINIJÁTÉK LOGIKA ---
@@ -513,7 +607,6 @@
                 timeLeft--;
                 document.getElementById('game-timer').textContent = timeLeft;
                 
-                // Idő lejártához közeledve ketyegő hang is jöhetne, de maradunk az egyszerűségnél
                 if (timeLeft <= 0) {
                     clearInterval(state.gameTimer);
                     endMiniGame();
