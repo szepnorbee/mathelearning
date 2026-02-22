@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#4ECDC4">
-    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="apple-touch-icon" href="./icon-192.png">
     
     <title>Matek Kaland</title>
     <style>
@@ -148,6 +148,8 @@
         button.btn-red:active:not(:disabled) { box-shadow: 0 0 0 #c0392b; }
         button.btn-accent { background-color: var(--accent); color: var(--dark); box-shadow: 0 6px 0 #d4ac0d; }
         button.btn-accent:active:not(:disabled) { box-shadow: 0 0 0 #d4ac0d; }
+        button.btn-install { background-color: #3498db; box-shadow: 0 6px 0 #2980b9; margin-top: 1rem; display: none; }
+        button.btn-install:active:not(:disabled) { box-shadow: 0 0 0 #2980b9; }
 
         /* --- FOLYAMATJELZŐ CSS --- */
         .progress-bar {
@@ -307,6 +309,8 @@
             <hr style="border-top: 3px dotted #bdc3c7; margin: 1rem 0;">
             <h2>Játéksarok</h2>
             <button class="btn-accent" onclick="openMiniGameMenu()">🎮 Lufivadászat (50 ⭐)</button>
+            
+            <button id="install-btn" class="btn-install" onclick="installPWA()">📲 Alkalmazás Telepítése</button>
         </div>
 
         <div id="view-practice" class="view">
@@ -350,13 +354,37 @@
     </main>
 
     <script>
-        // --- PWA SERVICE WORKER REGISZTRÁCIÓ ---
+        // --- PWA SERVICE WORKER REGISZTRÁCIÓ & TELEPÍTÉS KEZELÉSE ---
+        let deferredPrompt;
+
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
                     .then(reg => console.log('Service Worker regisztrálva!', reg))
                     .catch(err => console.log('Service Worker hiba:', err));
             });
+        }
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Megakadályozzuk a natív böngészős felugró ablakot
+            e.preventDefault();
+            // Eltároljuk az eseményt a gombnyomáshoz
+            deferredPrompt = e;
+            // Megjelenítjük a saját telepítés gombunkat
+            document.getElementById('install-btn').style.display = 'block';
+        });
+
+        function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('Felhasználó elfogadta a telepítést');
+                        document.getElementById('install-btn').style.display = 'none';
+                    }
+                    deferredPrompt = null;
+                });
+            }
         }
 
         // --- ÁLLAPOTTÉR ---
@@ -472,7 +500,6 @@
 
             document.getElementById('score-display').textContent = state.points;
             
-            // Érték mentése a LocalStorage-ba
             localStorage.setItem('matekKalandPoints', state.points);
             
             const badge = document.getElementById('points-container');
